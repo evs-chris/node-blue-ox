@@ -79,9 +79,9 @@ function relTime(ms) {
   return res;
 }
 
-var levelColors = { trace: 4, error: 1, fatal: 5, warn: 3, debug: 2, custom: 6, unknown: 6 };
+var levelColors = { trace: 4, error: 1, fatal: 5, warn: 3, debug: 2, custom: 6, unknown: 6, info: 2 };
 
-var globalLevel = levels.warn;
+var globalLevel = levels.info;
 function levelControl(level, scope) {
   var scp;
   if (arguments.length === 0) return (reverseLevels[globalLevel] || 'unknown').toUpperCase();
@@ -177,8 +177,9 @@ var proto = {
 };
 
 _.each({
-  trace: 100,
-  debug: 80,
+  trace: 120,
+  debug: 100,
+  info: 80,
   warn: 60,
   error: 40,
   fatal: 20
