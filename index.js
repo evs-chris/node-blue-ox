@@ -32,10 +32,10 @@ function removeLevel(name) {
 }
 
 var colorCodes = [6, 1, 4, 3, 5, 2];
-var brightColors = function(c) { if (out.color) return '\u001b[3' + c + 'm'; else return ''; };
-var colors = function(c) { if (out.color) return '\u001b[1m\u001b[3' + c + 'm'; else return ''; };
-var reset = function() { if (out.color) return '\u001b[0m'; else return ''; };
-var ansi = function(code) { if (out.color) return '\u001b[' + code + 'm'; else return ''; };
+var brightColors = function brightColors(c) { if (out.useColor) return '\u001b[3' + c + 'm'; else return ''; };
+var colors = function colors(c) { if (out.useColor) return '\u001b[1m\u001b[3' + c + 'm'; else return ''; };
+var reset = function reset() { if (out.useColor) return '\u001b[0m'; else return ''; };
+var ansi = function ansi(code) { if (out.useColor) return '\u001b[' + code + 'm'; else return ''; };
 
 var useBlacklist = true;
 var blacklist = [];
@@ -110,7 +110,7 @@ var availableOutputs = {
     recordTpl: null,
     output: function(level, scope, message) {
       if (message.indexOf('\n') > 0) message = message.replace(/\n+$/g, '').replace(/\n(\t| {1,4})?/gm, '\n  ' + ansi(90) + '|' + reset() + ' ');
-      console.log(this.recordTpl({ level: level, levelColor: levelColors[level] || levelColors.custom, scope: scope.scope, scopeColor: scope.color, message: message, time: (scope.timing === true || timing) ? '+' + relTime(scope.timeOffset) + ' ' : '' }));
+      console.log(this.recordTpl({ level: level, levelColor: levelColors[level] || levelColors.custom, scope: scope.scope, scopeColor: scope.localColor, message: message, time: (scope.timing === true || timing) ? '+' + relTime(scope.timeOffset) + ' ' : '' }));
     },
     record: function(rec) {
       this._record = rec;
@@ -173,7 +173,28 @@ function logProxy(level, scope, message, args) {
 
 var proto = {
   log: function log(level, message) { logProxy(level, this, message, _.toArray(arguments).slice(2)); },
-  level: function level() { var args = _.toArray(arguments); args.push(this.scope); return levelControl.apply(null, args); }
+  level: function level() { var args = _.toArray(arguments); args.push(this.scope); return levelControl.apply(null, args); },
+  color: function() {
+    var c, str, bright;
+
+    if (arguments.length === 2) { // color and string
+      c = arguments[0];
+      bright = false;
+      str = arguments[1];
+    } else if (arguments.length === 3) { // color, bright, and string
+      c = arguments[0];
+      bright = arguments[1];
+      str = arguments[2];
+    }
+
+    if (!out.useColor) return str;
+
+    if (typeof c === 'string') {
+      return (bright ? colors : brightColors)(levelColors[c]) + str + reset();
+    } else {
+      return (bright ? colors : brightColors)(c) + str + reset();
+    }
+  }
 };
 
 _.each({
@@ -194,7 +215,7 @@ var out = module.exports = function(scope) {
       scp.root = root;
     } else {
       scp = Object.create(proto);
-      scp.color = nextColor();
+      scp.localColor = nextColor();
     }
     scp.scope = scope;
     scopes[scope] = scp;
@@ -203,7 +224,7 @@ var out = module.exports = function(scope) {
 };
 
 out.currentColor = 0;
-out.color = tty.isatty(1);
+out.useColor = tty.isatty(1);
 out.addOutput = addOutput;
 out.useOutputs = useOutputs;
 out.level = levelControl;
