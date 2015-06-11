@@ -32,8 +32,8 @@ function removeLevel(name) {
 }
 
 var colorCodes = [6, 1, 4, 3, 5, 2];
-var brightColors = function brightColors(c) { if (out.useColor) return '\u001b[3' + c + 'm'; else return ''; };
-var colors = function colors(c) { if (out.useColor) return '\u001b[1m\u001b[3' + c + 'm'; else return ''; };
+var brightColors = function brightColors(c) { c = c === undefined ? 1 : c; if (out.useColor) return '\u001b[3' + c + 'm'; else return ''; };
+var colors = function colors(c) { c = c === undefined ? 1 : c; if (out.useColor) return '\u001b[1m\u001b[3' + c + 'm'; else return ''; };
 var reset = function reset() { if (out.useColor) return '\u001b[0m'; else return ''; };
 var ansi = function ansi(code) { if (out.useColor) return '\u001b[' + code + 'm'; else return ''; };
 
@@ -80,8 +80,8 @@ function relTime(ms) {
 }
 
 var levelColors = { trace: 4, error: 1, fatal: 5, warn: 3, debug: 2, custom: 6, unknown: 6, info: 2 };
+var ansiColors = { 'red': 1, 'green': 2, 'yellow': 3, 'blue': 4, 'magenta': 5, 'pink': 5, 'cyan': 6, 'aqua': 6, 'black': 0, 'white': 7 };
 
-var globalLevel = levels.info;
 function levelControl(level, scope) {
   var scp;
   if (arguments.length === 0) return (reverseLevels[globalLevel] || 'unknown').toUpperCase();
@@ -109,7 +109,7 @@ var availableOutputs = {
     _record: '{{ brightColor(levelColor) }}{{ level.toUpperCase() }}{{ reset() }}{{ ansi(90) }}:{{ reset() }} {{ color(scopeColor) }}{{ scope }}{{ reset() }} {{ ansi(94) }}{{ time }}{{ reset() }}{{ ansi(90) }}>{{ reset() }} {{ message }}',
     recordTpl: null,
     output: function(level, scope, message) {
-      if (message.indexOf('\n') > 0) message = message.replace(/\n+$/g, '').replace(/\n(\t| {1,4})?/gm, '\n  ' + ansi(90) + '|' + reset() + ' ');
+      if (message.indexOf('\n') > 0) message = message.replace(/\n+$/g, '').replace(/\t/g, '  ').replace(/\n(  )?/gm, '\n  ' + ansi(90) + '|' + reset() + ' ');
       console.log(this.recordTpl({ level: level, levelColor: levelColors[level] || levelColors.custom, scope: scope.scope, scopeColor: scope.localColor, message: message, time: (scope.timing === true || timing) ? '+' + relTime(scope.timeOffset) + ' ' : '' }));
     },
     record: function(rec) {
@@ -131,6 +131,8 @@ function nextColor() {
   return colorCodes[cur];
 }
 
+function strOrInspect(v) { return typeof v === 'string' ? v : util.inspect(v); }
+
 function logProxy(level, scope, message, args) {
   var stack = _.foldl(_.first(scope.scope.split(':'), 2), function(a, c) { a.push((a.length > 0 ? a[a.length - 1] + ':' : '') + c); return a; }, []);
   if (useBlacklist) {
@@ -149,13 +151,13 @@ function logProxy(level, scope, message, args) {
       message = util.format.apply(null, args);
     } else {
       if (util.isError(message)) {
-        message = message.stack + '\n' + _.map(args, util.inspect).join(' ');
+        message = message.stack.replace(/\n  /gm, '\n') + '\n' + _.map(args, strOrInspect).join(' ');
       } else {
         if (typeof message === 'string' && args.length > 0)
-          message += '\n' + _.map(args, util.inspect).join(' ');
+          message += '\n' + _.map(args, strOrInspect).join(' ');
         else {
           args.unshift(message);
-          message = _.map(args, util.inspect).join(' ');
+          message = _.map(args, strOrInspect).join(' ');
         }
       }
     }
@@ -175,7 +177,7 @@ var proto = {
   log: function log(level, message) { logProxy(level, this, message, _.toArray(arguments).slice(2)); },
   level: function level() { var args = _.toArray(arguments); args.push(this.scope); return levelControl.apply(null, args); },
   color: function() {
-    var c, str, bright;
+    var c, col, str, bright;
 
     if (arguments.length === 2) { // color and string
       c = arguments[0];
@@ -190,12 +192,18 @@ var proto = {
     if (!out.useColor) return str;
 
     if (typeof c === 'string') {
-      return (bright ? colors : brightColors)(levelColors[c]) + str + reset();
+      c = c.toLowerCase();
+      col = levelColors[c];
+      if (col === undefined) col = ansiColors[c];
+      if (col === undefined) col = 1;
+      return (bright ? colors : brightColors)(col) + str + reset();
     } else {
       return (bright ? colors : brightColors)(c) + str + reset();
     }
   }
 };
+proto.color.reset = reset;
+proto.color.ansi = ansi;
 
 _.each({
   trace: 120,
@@ -205,8 +213,9 @@ _.each({
   error: 40,
   fatal: 20
 }, function(v, k) { addLevel(k, v); });
+var globalLevel = levels.warn;
 
-var out = module.exports = function(scope) {
+var out = module.exports = function(scope, level) {
   var scp = scopes[scope], root;
   if (scp === undefined || scp === null) {
     if (scope.indexOf(':') > 0) root = scopes[scope.replace(/:.*$/, '')];
@@ -219,7 +228,11 @@ var out = module.exports = function(scope) {
     }
     scp.scope = scope;
     scopes[scope] = scp;
+
+    if (typeof level === 'string') scp._level = levels[level];
+    else if (typeof level === 'number') scp._level = level;
   }
+
   return scp;
 };
 
@@ -243,7 +256,8 @@ out.removeLevel = removeLevel;
 out.console = availableOutputs.console;
 out.outputs = outputs;
 out.availableOutputs = availableOutputs;
+out.color = proto.color;
 
 out.humanizeMs = relTime;
 
-out.beGlobal = function(please) { if (arguments.length === 0 || please) global['blue-ox'] = out; else delete global['blue-ox']; };
+out.beGlobal = function(please) { if (arguments.length === 0 || please) global['blue-ox'] = out; else delete global['blue-ox']; return out; };
