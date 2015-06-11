@@ -1,25 +1,25 @@
 {
   "name": "blue-ox",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Logging inspired by giants with axes.",
   "homepage": "https://github.com/evs-chris/node-blue-ox",
   "license": "MIT",
   "author": { "name": "Chris Reeves" },
   "main": "index.js",
   "repository": { "type": "git", "url": "https://github.com/evs-chris/node-blue-ox.git" },
-    "files": [ "package.json", "index.js", "LICENSE.md" ],
-    "engines": {
-      "node": ">=0.10.0"
-    },
-    "dependencies": {
-      "lodash": "^2"
-    },
-    "devDependencies": {
-      "mocha": "^1",
-      "should": "^4"
-    },
-    "scripts": {
-      "test": "node_modules/.bin/mocha --reporter spec test.js",
-      "console": "node"
-    }
+  "files": [ "package.json", "index.js", "LICENSE.md" ],
+  "engines": {
+    "node": ">=0.10.0"
+  },
+  "dependencies": {
+    "lodash": "^2"
+  },
+  "devDependencies": {
+    "mocha": "^1",
+    "should": "^4"
+  },
+  "scripts": {
+    "test": "node_modules/.bin/mocha --reporter spec test.js",
+    "console": "node"
+  }
 }
